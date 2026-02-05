@@ -73,7 +73,9 @@ class ICMP:
     cksum: int
 
     def __init__(self, buffer: bytes):
-        pass  # TODO
+        self.type = buffer[0]
+        self.code = buffer[1]
+        self.cksum = int.from_bytes(buffer[2:4], "big")
 
     def __str__(self) -> str:
         return f"ICMP (type {self.type}, code {self.code}, " + \
@@ -92,7 +94,10 @@ class UDP:
     cksum: int
 
     def __init__(self, buffer: bytes):
-        pass  # TODO
+        self.src_port = int.from_bytes(buffer[:2], "big")
+        self.dst_port = int.from_bytes(buffer[2:4], "big")
+        self.len =  int.from_bytes(buffer[4:6], "big")
+        self.cksum = int.from_bytes(buffer[6:8], "big")
 
     def __str__(self) -> str:
         return f"UDP (src_port {self.src_port}, dst_port {self.dst_port}, " + \
@@ -128,13 +133,13 @@ def traceroute(sendsock: util.Socket, recvsock: util.Socket, ip: str) \
         print("packet byte", buf.hex())
         print("ip", address[0])
         print("port", address[1])
-        return ("packet byte", buf.hex())
+        # return ("packet byte", buf.hex())
 
 
     # TODO Add your implementation
     # for ttl in range(1, TRACEROUTE_MAX_TTL+1):
     #     util.print_result([], ttl)
-    # return []
+    return []
 
 
 if __name__ == '__main__':
