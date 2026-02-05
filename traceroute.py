@@ -152,15 +152,32 @@ def traceroute(sendsock: util.Socket, recvsock: util.Socket, ip: str) \
                 buf, address = recvsock.recvfrom()
             else:
                 continue 
+
+            if len(buf)<20:
+                continue 
+
             
             ipv = IPv4(buf[:20])
             protocol = ipv.proto
-            
+
+            if len(buf) < ipv.header_len + 8:
+                continue
+        
             if protocol == 1:
                 icmp_start = ipv.header_len
                 icmp = ICMP(buf[icmp_start:icmp_start + 8])
                 type = icmp.type
                 code = icmp.code
+
+                if type != 3 and type != 11:
+                     continue 
+                
+                if type == 3 and code != 0:
+                    continue 
+                    
+                if type == 3 and code != 3:
+                    continue 
+
 
                 if type == 3 and code == 3:
                     result.append([ip])
