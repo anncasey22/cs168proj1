@@ -141,7 +141,7 @@ def traceroute(sendsock: util.Socket, recvsock: util.Socket, ip: str) \
         #   print_result(responders, ttl)
         #   append responders to result
         #   if any responder == destination OR ICMP type=3 code=3: stop and return
-    result = []
+    result = set()
     for ttl in range(1, TRACEROUTE_MAX_TTL+1):
         level = set()
         for i in range(PROBE_ATTEMPT_COUNT):
@@ -167,10 +167,10 @@ def traceroute(sendsock: util.Socket, recvsock: util.Socket, ip: str) \
                 if type == 3 and code == 3:
                     result.append(list(level))
                     result.append([ip])
-                    return result 
+                    return list(result)
                     
         result.append(list(level))
-    return result 
+    return list(result)
 
         
 
