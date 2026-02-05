@@ -124,22 +124,59 @@ def traceroute(sendsock: util.Socket, recvsock: util.Socket, ip: str) \
     routers were found, the ith list can be empty.  If `ip` is discovered, it
     should be included as the final element in the list.
     """
-    sendsock.set_ttl(30)
-    sendsock.sendto("lala".encode(), (ip, TRACEROUTE_PORT_NUMBER))
+    # sendsock.set_ttl(30)
+    # sendsock.sendto("lala".encode(), (ip, TRACEROUTE_PORT_NUMBER))
 
-    if recvsock.recv_select():
-        buf, address = recvsock.recvfrom()
+    # if recvsock.recv_select():
+    #     buf, address = recvsock.recvfrom()
 
-        print("packet byte", buf.hex())
-        print("ip", address[0])
-        print("port", address[1])
+    #     print("packet byte", buf.hex())
+    #     print("ip", address[0])
+    #     print("port", address[1])
         # return ("packet byte", buf.hex())
+    
+    # for ttl = 1..MAX:
+        #   send PROBE_ATTEMPT_COUNT UDP probes with this ttl
+        #   collect unique responder IPs for this ttl
+        #   print_result(responders, ttl)
+        #   append responders to result
+        #   if any responder == destination OR ICMP type=3 code=3: stop and return
+    result = []
+    for ttl in range(1, TRACEROUTE_MAX_TTL+1):
+        level = set()
+        for i in range(PROBE_ATTEMPT_COUNT):
+            sendsock.set_ttl(ttl)
+            sendsock.sendto("lala".encode(), (ip, TRACEROUTE_PORT_NUMBER))
 
+            if recvsock.recv_select():
+                buf, address = recvsock.recvfrom()
+            else:
+                continue 
+            
+            ipv = IPv4(buf[:20])
+            protocol = ipv.proto
+            
+            if protocol == 1:
+                icmp_start = ipv.header_len
+                icmp = ICMP(buf[icmp_start:icmp_start + 8])
+                type = icmp.type
+                code = icmp.code
+
+                level.add(address[0])
+
+                if type == 3 and code == 3:
+                    result.append(list(level))
+                    result.append([ip])
+                    return result 
+                    
+        result.append(list(level))
+    return result 
+
+        
 
     # TODO Add your implementation
-    # for ttl in range(1, TRACEROUTE_MAX_TTL+1):
-    #     util.print_result([], ttl)
-    return []
+    for ttl in range(1, TRACEROUTE_MAX_TTL+1):
+        util.print_result([], ttl)
 
 
 if __name__ == '__main__':
