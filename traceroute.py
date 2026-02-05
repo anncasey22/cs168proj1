@@ -49,8 +49,8 @@ class IPv4:
         self.ttl = int(buf[64:72],2)  
         self.proto= int(buf[72:80],2)  
         self.cksum = int(buf[80:96],2)  
-        self.src = '.'.join(str(int(buf[i:i+8], 2)) for _ in range(96, 128, 8))
-        self.dst = '.'.join(str(int(buf[i:i+8], 2)) for _ in range(128, 160, 8))
+        self.src = '.'.join(str(int(buf[i:i+8], 2)) for i in range(96, 128, 8))
+        self.dst = '.'.join(str(int(buf[i:i+8], 2)) for i in range(128, 160, 8))
 
 
     def __str__(self) -> str:
