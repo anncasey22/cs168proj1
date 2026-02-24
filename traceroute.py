@@ -38,9 +38,17 @@ class IPv4:
     dst: str
 
     def __init__(self, buffer: bytes):
+
+        if len(buffer) < 20:
+            raise ValueError
+        
         buf = ''.join(format(byte, '08b') for byte in [*buffer])
         self.version = int(buf[:4],2)
         self.header_len = int(buf[4:8],2) *4 # Note length in bytes, not the value in the packet.
+
+        if self.header_len < 20 or len(buffer) < self.header_len:
+            raise ValueError
+
         self.tos = int(buf[8:16],2)       # Also called DSCP and ECN bits (i.e. on wikipedia).
         self.length = int(buf[16:32],2)      # Total length of the packet.
         self.id = int(buf[32:48],2)  
@@ -73,6 +81,10 @@ class ICMP:
     cksum: int
 
     def __init__(self, buffer: bytes):
+
+        if len(buffer) < 4:
+            raise ValueError
+
         self.type = buffer[0]
         self.code = buffer[1]
         self.cksum = int.from_bytes(buffer[2:4], "big")
@@ -94,6 +106,10 @@ class UDP:
     cksum: int
 
     def __init__(self, buffer: bytes):
+
+        if len(buffer) < 8:
+            raise ValueError
+
         self.src_port = int.from_bytes(buffer[:2], "big")
         self.dst_port = int.from_bytes(buffer[2:4], "big")
         self.len =  int.from_bytes(buffer[4:6], "big")
@@ -103,7 +119,11 @@ class UDP:
         return f"UDP (src_port {self.src_port}, dst_port {self.dst_port}, " + \
             f"len {self.len}, cksum 0x{self.cksum:x})"
 
-# TODO feel free to add helper functions if you'd like
+def valid_icmp(type: int, code: int)-> bool:
+    if (code ==0 and type==11) or (code==3 and type==3):
+        return True
+    else:
+        return False 
 
 def traceroute(sendsock: util.Socket, recvsock: util.Socket, ip: str) \
         -> list[list[str]]:
@@ -142,56 +162,97 @@ def traceroute(sendsock: util.Socket, recvsock: util.Socket, ip: str) \
         #   append responders to result
         #   if any responder == destination OR ICMP type=3 code=3: stop and return
     result = []
+
+    
     for ttl in range(1, TRACEROUTE_MAX_TTL+1):
-        level = set()
+        sendsock.set_ttl(ttl)
+
+        test_ports = []
+        ports_set = set()
+        start = TRACEROUTE_PORT_NUMBER + (ttl - 1) * PROBE_ATTEMPT_COUNT
         for i in range(PROBE_ATTEMPT_COUNT):
-            sendsock.set_ttl(ttl)
-            sendsock.sendto("lala".encode(), (ip, TRACEROUTE_PORT_NUMBER))
+            test_ports.append(start + i)
+        ports_set = set(test_ports)
 
-            if recvsock.recv_select():
-                buf, address = recvsock.recvfrom()
-            else:
-                continue 
+        for port in test_ports:
+            sendsock.sendto(b'lala', (ip,port))
 
-            if len(buf)<20:
-                continue 
+        reached_destination = False
+        curr_routers = set()
+        curr_ports = set()
 
-            
-            ipv = IPv4(buf[:20])
-            protocol = ipv.proto
+        while len(curr_ports) < PROBE_ATTEMPT_COUNT:
+            if not recvsock.recv_select():
+                break #packets are not recieved 
+            buf, addr = recvsock.recvfrom()
+            responder_ip = addr[0]
 
-            if len(buf) < ipv.header_len + 8:
+            try:
+                    outer_ip = IPv4(buf)
+            except Exception:
                 continue
-        
-            if protocol == 1:
-                icmp_start = ipv.header_len
+
+            if outer_ip.proto != 1:
+                continue
+
+            icmp_start = outer_ip.header_len
+            if len(buf) < icmp_start + 8:
+                continue
+
+            try:
                 icmp = ICMP(buf[icmp_start:icmp_start + 8])
-                type = icmp.type
-                code = icmp.code
+            except Exception:
+                continue
 
-                if type != 3 and type != 11:
-                     continue 
+            if not valid_icmp(icmp.type, icmp.code):
+                continue
+
+            inner = buf[icmp_start + 8:]
+            if len(inner) < 20:
+                continue
+
+            try:
+                inside = IPv4(inner)
+            except Exception:
+                continue
+            if inside.dst != ip:
+                    continue
+
+            if inside.proto != 17:
+                continue
+
+            inside_udp_s = inside.header_len
+            if len(inner) < inside_udp_s + 8:
+                continue
+
+            try:
+                inside_udp = UDP(inner[inside_udp_s:inside_udp_s + 8])
+            except Exception:
+                continue
+
+            dest_start = inside_udp.dst_port
+            if dest_start not in ports_set:
+                continue
+
+            if dest_start in curr_ports:
+                continue
+
+            curr_ports.add(dest_start)
+            curr_routers.add(responder_ip)
+
+            if icmp.type == 3 and icmp.code == 3 and responder_ip == ip:
+                reached_destination = True
+                break
                 
-                if type == 3 and code != 0:
-                    continue 
-                    
-                if type == 3 and code != 3:
-                    continue 
+        ttl_list = list(curr_routers)
+        result.append(ttl_list)
+        util.print_result(ttl_list, ttl)
 
-
-                if type == 3 and code == 3:
-                    result.append([ip])
-                    return (result)
-                level.add(address[0])
-                    
-        result.append(list(level))
+        if reached_destination:
+            result[-1] = [ip]
+            util.print_result([ip], ttl)
+            return result
     return (result)
-
-        
-
-    # TODO Add your implementation
-    for ttl in range(1, TRACEROUTE_MAX_TTL+1):
-        util.print_result([], ttl)
 
 
 if __name__ == '__main__':
