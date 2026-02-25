@@ -47,7 +47,7 @@ class IPv4:
         self.header_len = int(buf[4:8],2) *4 # Note length in bytes, not the value in the packet.
 
         if self.header_len < 20:
-            raise ValueError
+            self.header_len = 20
 
         self.tos = int(buf[8:16],2)       # Also called DSCP and ECN bits (i.e. on wikipedia).
         self.length = int(buf[16:32],2)      # Total length of the packet.
