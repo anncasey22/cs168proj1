@@ -46,7 +46,7 @@ class IPv4:
         self.version = int(buf[:4],2)
         self.header_len = int(buf[4:8],2) *4 # Note length in bytes, not the value in the packet.
 
-        if self.header_len < 20 or len(buffer) < self.header_len:
+        if self.header_len < 20:
             raise ValueError
 
         self.tos = int(buf[8:16],2)       # Also called DSCP and ECN bits (i.e. on wikipedia).
@@ -240,7 +240,7 @@ def traceroute(sendsock: util.Socket, recvsock: util.Socket, ip: str) \
             curr_ports.add(dest_start)
             curr_routers.add(responder_ip)
 
-            if icmp.type == 3 and icmp.code == 3 and responder_ip == ip:
+            if icmp.type == 3 and icmp.code == 3:
                 reached_destination = True
                 break
                 
